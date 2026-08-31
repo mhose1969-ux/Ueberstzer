@@ -7,8 +7,32 @@
     <style>
         body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; max-width: 600px; margin: auto; background-color: #f4f6f8; }
         h2 { text-align: center; color: #2c3e50; margin-bottom: 5px; }
-        .subtitle { text-align: center; color: #7f8c8d; font-size: 14px; margin-bottom: 25px; }
+        .subtitle { text-align: center; color: #7f8c8d; font-size: 14px; margin-bottom: 20px; }
         
+        /* Einstellungen / Dropdown */
+        .settings-card {
+            background: white;
+            padding: 12px 15px;
+            border-radius: 12px;
+            border: 1px solid #e0e0e0;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+        }
+        .settings-card label { font-weight: bold; color: #34495e; font-size: 14px; margin: 0; }
+        .settings-card select { 
+            padding: 8px 12px; 
+            border-radius: 8px; 
+            border: 1px solid #cccccc; 
+            background: #ffffff; 
+            font-size: 14px; 
+            font-weight: bold;
+            color: #2c3e50;
+            outline: none;
+        }
+
         /* Flaggen-Buttons */
         .flag-container { display: flex; gap: 15px; margin-bottom: 20px; }
         .flag-card { 
@@ -55,7 +79,15 @@
 <body>
 
     <h2>Live Übersetzer</h2>
-    <div class="subtitle">Tippe auf die Sprache, die gesprochen wird</div>
+    <div class="subtitle">Tippe jederzeit auf eine Flagge zum Umschalten</div>
+
+    <!-- Dropdown für Verzögerung -->
+    <div class="settings-card">
+        <label for="delaySelect">⏱️ Stille-Pause bis Übersetzung:</label>
+        <select id="delaySelect">
+            <!-- Dynamisch gefüllt von 1 bis 20 Sekunden -->
+        </select>
+    </div>
 
     <div id="status">Bereit...</div>
 
@@ -92,12 +124,22 @@
         const statusDiv = document.getElementById('status');
         const originalDiv = document.getElementById('originalText');
         const translatedDiv = document.getElementById('translatedText');
+        const delaySelect = document.getElementById('delaySelect');
 
         let recognition;
         let isListening = false;
         let silenceTimer = null;
         let lastText = "";
         let currentSourceLang = "es";
+
+        // Dropdown für 1 bis 20 Sekunden befüllen
+        for (let i = 1; i <= 20; i++) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.innerText = `${i} Sekunde${i > 1 ? 'n' : ''}`;
+            if (i === 5) opt.selected = true;
+            delaySelect.appendChild(opt);
+        }
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -133,11 +175,18 @@
             };
         }
 
-        btnEs.addEventListener('click', () => startListening('es'));
-        btnDe.addEventListener('click', () => startListening('de'));
+        // Klick auf Flaggen ruft 'switchOrStartLanguage' auf
+        btnEs.addEventListener('click', () => switchOrStartLanguage('es'));
+        btnDe.addEventListener('click', () => switchOrStartLanguage('de'));
         btnStop.addEventListener('click', stopListening);
 
-        function startListening(lang) {
+        function switchOrStartLanguage(lang) {
+            // Falls bereits zugehört wird, beenden wir kurz die aktive Erkennung
+            if (isListening) {
+                clearTimeout(silenceTimer);
+                try { recognition.stop(); } catch(e) {}
+            }
+
             currentSourceLang = lang;
             recognition.lang = lang === 'es' ? 'es-ES' : 'de-DE';
             
@@ -147,19 +196,24 @@
             btnEs.classList.remove('active-es');
             btnDe.classList.remove('active-de');
 
+            const selectedSeconds = delaySelect.value;
+
             if (lang === 'es') {
                 btnEs.classList.add('active-es');
-                statusDiv.innerText = "🔴 Höre auf Spanisch zu... (5s Stille-Timer aktiv)";
+                statusDiv.innerText = `🔴 Auf Spanisch umgestellt... (${selectedSeconds}s Timer aktiv)`;
             } else {
                 btnDe.classList.add('active-de');
-                statusDiv.innerText = "🔴 Höre auf Deutsch zu... (5s Stille-Timer aktiv)";
+                statusDiv.innerText = `🔴 Auf Deutsch umgestellt... (${selectedSeconds}s Timer aktiv)`;
             }
 
             originalDiv.innerText = "";
             translatedDiv.innerText = "";
             lastText = "";
             
-            try { recognition.start(); } catch(e) {}
+            // Mit der neuen Sprache direkt neu starten
+            setTimeout(() => {
+                try { recognition.start(); } catch(e) {}
+            }, 200);
         }
 
         function stopListening() {
@@ -169,18 +223,19 @@
             btnEs.classList.remove('active-es');
             btnDe.classList.remove('active-de');
             statusDiv.innerText = "Bereit...";
-            recognition.stop();
+            try { recognition.stop(); } catch(e) {}
         }
 
         function resetSilenceTimer() {
-            statusDiv.innerText = "Sprechen erkannt... (Warte auf 5s Stille)";
+            const selectedSeconds = parseInt(delaySelect.value, 10);
+            statusDiv.innerText = `Sprechen erkannt... (Warte auf ${selectedSeconds}s Stille)`;
             clearTimeout(silenceTimer);
             
             silenceTimer = setTimeout(() => {
                 if (lastText.trim() !== "") {
                     translateAndSpeak(lastText);
                 }
-            }, 5000);
+            }, selectedSeconds * 1000);
         }
 
         async function translateAndSpeak(text) {
