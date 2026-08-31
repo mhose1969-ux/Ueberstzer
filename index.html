@@ -3,28 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auto Live Übersetzer (ES/DE)</title>
+    <title>Live Übersetzer</title>
     <style>
-        body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; max-width: 600px; margin: auto; background-color: #f9f9f9; }
-        h2 { text-align: center; color: #333; }
-        button { padding: 15px; font-size: 18px; width: 100%; border-radius: 8px; border: none; background-color: #007bff; color: white; font-weight: bold; cursor: pointer; margin-bottom: 15px; }
-        button.active { background-color: #dc3545; }
-        .box { background: white; padding: 15px; border-radius: 8px; min-height: 80px; margin-bottom: 15px; border: 1px solid #e0e0e0; font-size: 16px; line-height: 1.4; }
-        .translation { background: #e8f5e9; border-color: #c8e6c9; font-weight: bold; }
-        #status { font-weight: bold; color: #0066cc; margin-bottom: 15px; text-align: center; }
-        label { font-weight: bold; display: block; margin-bottom: 5px; color: #555; }
-        .lang-badge { display: inline-block; padding: 3px 8px; background: #e0e0e0; border-radius: 4px; font-size: 12px; margin-left: 8px; }
+        body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; max-width: 600px; margin: auto; background-color: #f4f6f8; }
+        h2 { text-align: center; color: #2c3e50; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #7f8c8d; font-size: 14px; margin-bottom: 25px; }
+        
+        /* Flaggen-Buttons */
+        .flag-container { display: flex; gap: 15px; margin-bottom: 20px; }
+        .flag-card { 
+            flex: 1; 
+            background: white; 
+            border: 2px solid #e0e0e0; 
+            border-radius: 16px; 
+            padding: 20px 10px; 
+            text-align: center; 
+            cursor: pointer; 
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .flag-card:active { transform: scale(0.96); }
+        .flag-card.active-es { border-color: #e67e22; background-color: #fef5ec; box-shadow: 0 0 12px rgba(230, 126, 34, 0.3); }
+        .flag-card.active-de { border-color: #27ae60; background-color: #f0f9f4; box-shadow: 0 0 12px rgba(39, 174, 96, 0.3); }
+        
+        .flag-icon { font-size: 48px; display: block; margin-bottom: 8px; line-height: 1; }
+        .flag-label { font-weight: bold; font-size: 18px; color: #2c3e50; }
+        .flag-sub { font-size: 13px; color: #7f8c8d; margin-top: 4px; }
+
+        .btn-stop { 
+            background-color: #e74c3c; 
+            color: white; 
+            padding: 14px; 
+            font-size: 16px; 
+            font-weight: bold; 
+            width: 100%; 
+            border-radius: 10px; 
+            border: none; 
+            cursor: pointer; 
+            margin-bottom: 20px; 
+            display: none; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        /* Textausgabe */
+        .box { background: white; padding: 15px; border-radius: 10px; min-height: 70px; margin-bottom: 15px; border: 1px solid #e0e0e0; font-size: 16px; line-height: 1.4; }
+        .translation { background: #e8f5e9; border-color: #c8e6c9; font-weight: bold; color: #1b5e20; }
+        #status { font-weight: bold; color: #2980b9; margin-bottom: 15px; text-align: center; min-height: 22px; font-size: 15px; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; color: #34495e; }
     </style>
 </head>
 <body>
 
-    <h2>Auto-Übersetzer 🇪🇸 ↔️ 🇩🇪</h2>
+    <h2>Live Übersetzer</h2>
+    <div class="subtitle">Tippe auf die Sprache, die gesprochen wird</div>
+
     <div id="status">Bereit...</div>
 
-    <button id="startBtn">Zuhören starten</button>
+    <!-- Flaggen Auswahlschaltflächen -->
+    <div class="flag-container" id="flagButtons">
+        <div class="flag-card" id="btnEs">
+            <span class="flag-icon">🇪🇸</span>
+            <div class="flag-label">Spanisch</div>
+            <div class="flag-sub">➔ Deutsch</div>
+        </div>
+        <div class="flag-card" id="btnDe">
+            <span class="flag-icon">🇩🇪</span>
+            <div class="flag-label">Deutsch</div>
+            <div class="flag-sub">➔ Spanisch</div>
+        </div>
+    </div>
+
+    <button id="btnStop" class="btn-stop">⏹️ Zuhören beenden</button>
 
     <div>
-        <label>Erkannter Text: <span id="detectedLang" class="lang-badge">Auto</span></label>
+        <label>Erkannter Text:</label>
         <div id="originalText" class="box"></div>
     </div>
 
@@ -34,28 +86,27 @@
     </div>
 
     <script>
-        const startBtn = document.getElementById('startBtn');
+        const btnEs = document.getElementById('btnEs');
+        const btnDe = document.getElementById('btnDe');
+        const btnStop = document.getElementById('btnStop');
         const statusDiv = document.getElementById('status');
         const originalDiv = document.getElementById('originalText');
         const translatedDiv = document.getElementById('translatedText');
-        const detectedLangSpan = document.getElementById('detectedLang');
 
         let recognition;
         let isListening = false;
         let silenceTimer = null;
         let lastText = "";
+        let currentSourceLang = "es";
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         if (!SpeechRecognition) {
-            alert("Bitte nutze Chrome oder Edge für die Spracherkennung.");
+            alert("Bitte nutze Chrome oder Safari auf deinem Smartphone.");
         } else {
             recognition = new SpeechRecognition();
             recognition.continuous = true;
             recognition.interimResults = true;
-            
-            // Mehrsprachige Erkennung aktivieren (Spanisch & Deutsch)
-            recognition.lang = 'es-ES'; 
 
             recognition.onresult = (event) => {
                 let interimText = "";
@@ -82,22 +133,30 @@
             };
         }
 
-        startBtn.addEventListener('click', () => {
-            if (isListening) {
-                stopListening();
-            } else {
-                startListening();
-            }
-        });
+        btnEs.addEventListener('click', () => startListening('es'));
+        btnDe.addEventListener('click', () => startListening('de'));
+        btnStop.addEventListener('click', stopListening);
 
-        function startListening() {
+        function startListening(lang) {
+            currentSourceLang = lang;
+            recognition.lang = lang === 'es' ? 'es-ES' : 'de-DE';
+            
             isListening = true;
-            startBtn.innerText = "Stoppen";
-            startBtn.classList.add("active");
-            statusDiv.innerText = "Zuhören aktiv... Sprich Spanisch oder Deutsch!";
+            btnStop.style.display = "block";
+            
+            btnEs.classList.remove('active-es');
+            btnDe.classList.remove('active-de');
+
+            if (lang === 'es') {
+                btnEs.classList.add('active-es');
+                statusDiv.innerText = "🔴 Höre auf Spanisch zu... (5s Stille-Timer aktiv)";
+            } else {
+                btnDe.classList.add('active-de');
+                statusDiv.innerText = "🔴 Höre auf Deutsch zu... (5s Stille-Timer aktiv)";
+            }
+
             originalDiv.innerText = "";
             translatedDiv.innerText = "";
-            detectedLangSpan.innerText = "Auto";
             lastText = "";
             
             try { recognition.start(); } catch(e) {}
@@ -106,9 +165,10 @@
         function stopListening() {
             isListening = false;
             clearTimeout(silenceTimer);
-            startBtn.innerText = "Zuhören starten";
-            startBtn.classList.remove("active");
-            statusDiv.innerText = "Gestoppt.";
+            btnStop.style.display = "none";
+            btnEs.classList.remove('active-es');
+            btnDe.classList.remove('active-de');
+            statusDiv.innerText = "Bereit...";
             recognition.stop();
         }
 
@@ -118,48 +178,33 @@
             
             silenceTimer = setTimeout(() => {
                 if (lastText.trim() !== "") {
-                    autoTranslateAndSpeak(lastText);
+                    translateAndSpeak(lastText);
                 }
             }, 5000);
         }
 
-        async function autoTranslateAndSpeak(text) {
-            statusDiv.innerText = "Erkenne Sprache & Übersetze...";
+        async function translateAndSpeak(text) {
+            statusDiv.innerText = "Übersetze...";
+            
+            const sourceLang = currentSourceLang;
+            const targetLang = currentSourceLang === 'es' ? 'de' : 'es';
 
             try {
-                // Autodetect via MyMemory API (langpair=Autodetect|Ziel)
-                // Wir fragen zuerst die Erkennung/Übersetzung nach Deutsch ab
-                const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=autodetect|de`);
+                const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`);
                 const data = await response.json();
                 
-                let detectedLang = data.responseData.detectedLanguage || "";
-                let translation = data.responseData.translatedText;
-                let targetLang = "de";
-
-                // Wenn die erkannte Sprache Deutsch ist, übersetzen wir stattdessen nach Spanisch
-                if (detectedLang.toLowerCase() === "de" || detectedLang.toLowerCase().startsWith("de-")) {
-                    detectedLangSpan.innerText = "Erkannt: Deutsch 🇩🇪";
-                    targetLang = "es";
-                    
-                    const esResponse = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=de|es`);
-                    const esData = await esResponse.json();
-                    translation = esData.responseData.translatedText;
-                } else {
-                    detectedLangSpan.innerText = "Erkannt: Spanisch 🇪🇸";
-                    targetLang = "de";
-                }
-
+                const translation = data.responseData.translatedText;
                 translatedDiv.innerText = translation;
                 statusDiv.innerText = "Lese vor...";
 
-                // Vorlesen in der Zielsprache
                 const utterance = new SpeechSynthesisUtterance(translation);
                 utterance.lang = targetLang === 'de' ? 'de-DE' : 'es-ES';
                 
                 window.speechSynthesis.speak(utterance);
 
                 utterance.onend = () => {
-                    statusDiv.innerText = "Fertig. Höre weiter zu...";
+                    const langName = currentSourceLang === 'es' ? 'Spanisch 🇪🇸' : 'Deutsch 🇩🇪';
+                    statusDiv.innerText = `Fertig. Höre weiter zu auf ${langName}...`;
                     lastText = "";
                 };
 
