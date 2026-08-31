@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Übersetzer (5s Pause)</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+        button { padding: 12px 20px; font-size: 16px; width: 100%; margin-bottom: 15px; }
+        .box { background: #f0f0f0; padding: 15px; border-radius: 8px; min-height: 80px; margin-bottom: 15px; }
+        .translation { background: #e8f5e9; font-weight: bold; }
+        #status { font-weight: bold; color: #0066cc; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <h2>Live Übersetzer</h2>
+    <div id="status">Bereit...</div>
+
+    <label for="mode">Richtung:</label>
+    <select id="mode" style="margin-bottom: 15px; padding: 5px;">
+        <option value="es-de">Spanisch ➔ Deutsch</option>
+        <option value="de-es">Deutsch ➔ Spanisch</option>
+    </select>
+
+    <button id="startBtn">Zuhören starten</button>
+
+    <div>Erkannter Text:</div>
+    <div id="originalText" class="box"></div>
+
+    <div>Übersetzung:</div>
+    <div id="translatedText" class="box translation"></div>
+
+    <script>
+        const startBtn = document.getElementById('startBtn');
+        const statusDiv = document.getElementById('status');
+        const originalDiv = document.getElementById('originalText');
+        const translatedDiv = document.getElementById('translatedText');
+        const modeSelect = document.getElementById('mode');
+
+        let recognition;
+        let isListening = false;
+        let silenceTimer = null;
+        let lastText = "";
+
+        // Web Speech API Prüfen
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (!SpeechRecognition) {
+            alert("Dein Browser unterstützt keine Spracherkennung. Bitte nutze Google Chrome oder Edge.");
+        } else {
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+
+            recognition.onresult = (event) => {
+                let interimText = "";
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    interimText += event.results[i][0].transcript;
+                }
+                
+                originalDiv.innerText = interimText;
+                lastText = interimText;
+
+                // Timer bei jedem neuen Wort zurücksetzen
+                resetSilenceTimer();
+            };
+
+            recognition.onerror = (event) => {
+                console.error("Fehler:", event.error);
+                if (isListening) recognition.start(); // Neustart bei Abbruch
+            };
+
+            recognition.onend = () => {
+                if (isListening) recognition.start(); // Continuous Listening aufrechterhalten
+            };
+        }
+
+        startBtn.addEventListener('click', () => {
+            if (isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        });
+
+        function startListening() {
+            const mode = modeSelect.value;
+            recognition.lang = mode === 'es-de' ? 'es-ES' : 'de-DE';
+            
+            isListening = true;
+            startBtn.innerText = "Stoppen";
+            statusDiv.innerText = "Zuhören aktiv...";
+            originalDiv.innerText = "";
+            translatedDiv.innerText = "";
+            
+            recognition.start();
+        }
+
+        function stopListening() {
+            isListening = false;
+            clearTimeout(silenceTimer);
+            startBtn.innerText = "Zuhören starten";
+            statusDiv.innerText = "Gestoppt.";
+            recognition.stop();
+        }
+
+        function resetSilenceTimer() {
+            statusDiv.innerText = "Sprechen erkannt... (Warte auf 5s Stille)";
+            clearTimeout(silenceTimer);
+            
+            // 5000 ms = 5 Sekunden
+            silenceTimer = setTimeout(() => {
+                if (lastText.trim() !== "") {
+                    translateAndSpeak(lastText);
+                }
+            }, 5000);
+        }
+
+        async function translateAndSpeak(text) {
+            statusDiv.innerText = "Übersetze...";
+            
+            const mode = modeSelect.value;
+            const sourceLang = mode === 'es-de' ? 'es' : 'de';
+            const targetLang = mode === 'es-de' ? 'de' : 'es';
+
+            try {
+                // Nutzung der kostenlosen MyMemory Übersetzungs-API
+                const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`);
+                const data = await response.json();
+                
+                const translation = data.responseData.translatedText;
+                translatedDiv.innerText = translation;
+                statusDiv.innerText = "Lese vor...";
+
+                // Sprachausgabe (TTS) über den Browser
+                const utterance = new SpeechSynthesisUtterance(translation);
+                utterance.lang = targetLang === 'de' ? 'de-DE' : 'es-ES';
+                
+                window.speechSynthesis.speak(utterance);
+
+                utterance.onend = () => {
+                    statusDiv.innerText = "Fertig. Höre weiter zu...";
+                    lastText = "";
+                };
+
+            } catch (error) {
+                statusDiv.innerText = "Fehler bei der Übersetzung.";
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>
