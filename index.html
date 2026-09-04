@@ -1,322 +1,171 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Übersetzer (DeepL & Dual-Mic)</title>
-    <style>
-        body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; max-width: 600px; margin: auto; background-color: #f4f6f8; }
-        h2 { text-align: center; color: #2c3e50; margin-bottom: 5px; }
-        .subtitle { text-align: center; color: #7f8c8d; font-size: 14px; margin-bottom: 20px; }
-        
-        /* Einstellungen Card */
-        .settings-card {
-            background: white;
-            padding: 12px 15px;
-            border-radius: 12px;
-            border: 1px solid #e0e0e0;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
-        }
-        .setting-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 10px;
-        }
-        .setting-row:last-child { margin-bottom: 0; }
-        .setting-row label { font-weight: bold; color: #34495e; font-size: 13px; margin: 0; }
-        .setting-row select, .setting-row input { 
-            padding: 6px 10px; 
-            border-radius: 6px; 
-            border: 1px solid #cccccc; 
-            background: #ffffff; 
-            font-size: 13px; 
-            color: #2c3e50;
-            outline: none;
-        }
-        .setting-row input { width: 140px; }
-
-        /* Flaggen-Buttons */
-        .flag-container { display: flex; gap: 15px; margin-bottom: 20px; }
-        .flag-card { 
-            flex: 1; 
-            background: white; 
-            border: 2px solid #e0e0e0; 
-            border-radius: 16px; 
-            padding: 20px 10px; 
-            text-align: center; 
-            cursor: pointer; 
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        }
-        .flag-card:active { transform: scale(0.96); }
-        .flag-card.active-es { border-color: #e67e22; background-color: #fef5ec; box-shadow: 0 0 12px rgba(230, 126, 34, 0.3); }
-        .flag-card.active-de { border-color: #27ae60; background-color: #f0f9f4; box-shadow: 0 0 12px rgba(39, 174, 96, 0.3); }
-        
-        .flag-icon { font-size: 48px; display: block; margin-bottom: 8px; line-height: 1; }
-        .flag-label { font-weight: bold; font-size: 18px; color: #2c3e50; }
-        .flag-sub { font-size: 13px; color: #7f8c8d; margin-top: 4px; }
-
-        .btn-stop { 
-            background-color: #e74c3c; 
-            color: white; 
-            padding: 14px; 
-            font-size: 16px; 
-            font-weight: bold; 
-            width: 100%; 
-            border-radius: 10px; 
-            border: none; 
-            cursor: pointer; 
-            margin-bottom: 20px; 
-            display: none; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-
-        /* Textausgabe */
-        .box { background: white; padding: 15px; border-radius: 10px; min-height: 70px; margin-bottom: 15px; border: 1px solid #e0e0e0; font-size: 16px; line-height: 1.4; }
-        .translation { background: #e8f5e9; border-color: #c8e6c9; font-weight: bold; color: #1b5e20; }
-        #status { font-weight: bold; color: #2980b9; margin-bottom: 15px; text-align: center; min-height: 22px; font-size: 15px; }
-        label { font-weight: bold; display: block; margin-bottom: 5px; color: #34495e; }
-    </style>
+  <meta charset="UTF-8">
+  <title>Mikes Übersetzer (Prototyp V1)</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 0 20px; background: #f4f4f9; }
+    h1 { color: #333; }
+    .controls { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 5px; color: white; }
+    #startBtn { background-color: #28a745; }
+    #stopBtn { background-color: #dc3545; }
+    #downloadBtn { background-color: #007bff; }
+    #status { font-weight: bold; padding: 10px; background: #fff; border-radius: 5px; border: 1px solid #ccc; flex-grow: 1; }
+    #transcript { background: #fff; padding: 15px; border-radius: 5px; border: 1px solid #ccc; height: 400px; overflow-y: auto; }
+    .entry { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+    .lang-tag { font-weight: bold; color: #555; }
+    .original { font-style: italic; color: #333; }
+    .translation { font-weight: bold; color: #0056b3; }
+  </style>
 </head>
 <body>
 
-    <h2>Live Übersetzer (DeepL)</h2>
-    <div class="subtitle">Tippe jederzeit auf eine Flagge zum Umschalten</div>
+  <h1>Mikes Übersetzer (V1 Browser-Prototyp)</h1>
+  
+  <div class="controls">
+    <button id="startBtn" onclick="startListening()">Starten</button>
+    <button id="stopBtn" onclick="stopListening()">Stoppen</button>
+    <button id="downloadBtn" onclick="downloadTranscript()">Transkript Herunterladen</button>
+  </div>
 
-    <!-- Einstellungen -->
-    <div class="settings-card">
-        <div class="setting-row">
-            <label for="delaySelect">⏱️ Stille-Pause:</label>
-            <select id="delaySelect"></select>
+  <div id="status">Status: Bereit</div>
+
+  <h3>Transkript</h3>
+  <div id="transcript"></div>
+
+  <script>
+    let recognition;
+    let pauseTimer = null;
+    let accumulatedText = "";
+    let isListening = false;
+    let transcriptData = [];
+
+    // Prüfen, ob der Browser Web Speech API unterstützt
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Dein Browser unterstützt die Web Speech API leider nicht. Bitte benutze Google Chrome oder MS Edge.");
+    } else {
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'de-DE'; // Startsprache (Erkennt DE/ES dynamisch)
+
+      recognition.onresult = (event) => {
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            accumulatedText += event.results[i][0].transcript + ' ';
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+
+        const currentSpeech = accumulatedText + interimTranscript;
+        if (currentSpeech.trim().length > 0) {
+          document.getElementById('status').innerText = "Sprecher erkannt... (Warte auf 5 Sek. Pause)";
+          
+          // Timer zurücksetzen, wenn weiter gesprochen wird
+          clearTimeout(pauseTimer);
+          pauseTimer = setTimeout(() => {
+            processTranslation(accumulatedText.trim());
+            accumulatedText = "";
+          }, 5000); // 5000ms = 5 Sekunden Pause
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Spracherkennungsfehler:", event.error);
+        document.getElementById('status').innerText = "Fehler: " + event.error;
+      };
+
+      recognition.onend = () => {
+        if (isListening) {
+          recognition.start(); // Neustart bei Verbindungsabriss
+        }
+      };
+    }
+
+    function startListening() {
+      if (recognition && !isListening) {
+        isListening = true;
+        accumulatedText = "";
+        recognition.start();
+        document.getElementById('status').innerText = "Zuhören aktiv... Spreche auf Deutsch oder Spanisch.";
+      }
+    }
+
+    function stopListening() {
+      if (recognition && isListening) {
+        isListening = false;
+        clearTimeout(pauseTimer);
+        recognition.stop();
+        document.getElementById('status').innerText = "Gestoppt.";
+      }
+    }
+
+    // Einfache automatische Spracherkennung & Übersetzung
+    async function processTranslation(text) {
+      if (!text) return;
+
+      document.getElementById('status').innerText = "Übersetze...";
+
+      // Grobe Sprachprüfung (Spanische Typika oder DE)
+      const isSpanish = /[áéíóúñ¿¡]/i.test(text) || /\b(el|la|los|las|un|una|por|para|que|con|es|son)\b/i.test(text);
+      const sourceLang = isSpanish ? 'es' : 'de';
+      const targetLang = isSpanish ? 'de' : 'es';
+
+      try {
+        // Freie Google Translate API für Prototyp
+        const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`);
+        const data = await res.json();
+        const translatedText = data[0].map(item => item[0]).join('');
+
+        // Speichern im Transkript
+        addTranscriptEntry(sourceLang.toUpperCase(), targetLang.toUpperCase(), text, translatedText);
+
+        // Sprachausgabe
+        speakText(translatedText, targetLang);
+
+        document.getElementById('status').innerText = "Zuhören aktiv... Spreche auf Deutsch oder Spanisch.";
+      } catch (err) {
+        console.error("Übersetzungsfehler:", err);
+        document.getElementById('status').innerText = "Fehler bei der Übersetzung.";
+      }
+    }
+
+    function addTranscriptEntry(source, target, original, translation) {
+      const entryHtml = `
+        <div class="entry">
+          <div class="lang-tag">[${source} ➔ ${target}]</div>
+          <div class="original">Original: ${original}</div>
+          <div class="translation">Übersetzung: ${translation}</div>
         </div>
-        <div class="setting-row">
-            <label for="apiKeyInput">🔑 DeepL API Key:</label>
-            <input type="password" id="apiKeyInput" placeholder="Free API Key eintragen">
-        </div>
-    </div>
+      `;
+      document.getElementById('transcript').innerHTML += entryHtml;
+      document.getElementById('transcript').scrollTop = document.getElementById('transcript').scrollHeight;
 
-    <div id="status">Bereit...</div>
+      transcriptData.push(`[${source} -> ${target}]\nOriginal: ${original}\nÜbersetzung: ${translation}\n---`);
+    }
 
-    <!-- Flaggen Auswahlschaltflächen -->
-    <div class="flag-container" id="flagButtons">
-        <div class="flag-card" id="btnEs">
-            <span class="flag-icon">🇪🇸</span>
-            <div class="flag-label">Spanisch</div>
-            <div class="flag-sub">➔ Deutsch</div>
-        </div>
-        <div class="flag-card" id="btnDe">
-            <span class="flag-icon">🇩🇪</span>
-            <div class="flag-label">Deutsch</div>
-            <div class="flag-sub">➔ Spanisch</div>
-        </div>
-    </div>
+    function speakText(text, lang) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = lang === 'es' ? 'es-ES' : 'de-DE';
+      window.speechSynthesis.speak(utterance);
+    }
 
-    <button id="btnStop" class="btn-stop">⏹️ Zuhören beenden</button>
-
-    <div>
-        <label>Erkannter Text:</label>
-        <div id="originalText" class="box"></div>
-    </div>
-
-    <div>
-        <label>Übersetzung (DeepL):</label>
-        <div id="translatedText" class="box translation"></div>
-    </div>
-
-    <script>
-        const btnEs = document.getElementById('btnEs');
-        const btnDe = document.getElementById('btnDe');
-        const btnStop = document.getElementById('btnStop');
-        const statusDiv = document.getElementById('status');
-        const originalDiv = document.getElementById('originalText');
-        const translatedDiv = document.getElementById('translatedText');
-        const delaySelect = document.getElementById('delaySelect');
-        const apiKeyInput = document.getElementById('apiKeyInput');
-
-        let recognition;
-        let isListening = false;
-        let silenceTimer = null;
-        let lastText = "";
-        let currentSourceLang = "es";
-
-        // API Key im Browser-Speicher merken
-        const savedKey = localStorage.getItem('deepl_api_key');
-        if (savedKey) apiKeyInput.value = savedKey;
-
-        apiKeyInput.addEventListener('change', () => {
-            localStorage.setItem('deepl_api_key', apiKeyInput.value.trim());
-        });
-
-        // Dropdown für 1 bis 20 Sekunden befüllen
-        for (let i = 1; i <= 20; i++) {
-            const opt = document.createElement('option');
-            opt.value = i;
-            opt.innerText = `${i} Sekunde${i > 1 ? 'n' : ''}`;
-            if (i === 5) opt.selected = true;
-            delaySelect.appendChild(opt);
-        }
-
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-        if (!SpeechRecognition) {
-            alert("Bitte nutze Chrome oder Safari auf deinem Smartphone.");
-        } else {
-            recognition = new SpeechRecognition();
-            recognition.continuous = true;
-            recognition.interimResults = true;
-
-            recognition.onresult = (event) => {
-                let interimText = "";
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    interimText += event.results[i][0].transcript;
-                }
-                
-                originalDiv.innerText = interimText;
-                lastText = interimText;
-
-                resetSilenceTimer();
-            };
-
-            recognition.onerror = (event) => {
-                if (event.error !== 'no-speech' && isListening) {
-                    console.error("Fehler:", event.error);
-                }
-            };
-
-            recognition.onend = () => {
-                if (isListening) {
-                    try { recognition.start(); } catch(e) {}
-                }
-            };
-        }
-
-        btnEs.addEventListener('click', () => switchOrStartLanguage('es'));
-        btnDe.addEventListener('click', () => switchOrStartLanguage('de'));
-        btnStop.addEventListener('click', stopListening);
-
-        function switchOrStartLanguage(lang) {
-            if (isListening) {
-                clearTimeout(silenceTimer);
-                try { recognition.stop(); } catch(e) {}
-            }
-
-            currentSourceLang = lang;
-            recognition.lang = lang === 'es' ? 'es-ES' : 'de-DE';
-            
-            isListening = true;
-            btnStop.style.display = "block";
-            
-            btnEs.classList.remove('active-es');
-            btnDe.classList.remove('active-de');
-
-            const selectedSeconds = delaySelect.value;
-
-            if (lang === 'es') {
-                btnEs.classList.add('active-es');
-                statusDiv.innerText = `🔴 Höre Spanisch zu... (${selectedSeconds}s Timer aktiv)`;
-            } else {
-                btnDe.classList.add('active-de');
-                statusDiv.innerText = `🔴 Höre Deutsch zu... (${selectedSeconds}s Timer aktiv)`;
-            }
-
-            originalDiv.innerText = "";
-            translatedDiv.innerText = "";
-            lastText = "";
-            
-            setTimeout(() => {
-                try { recognition.start(); } catch(e) {}
-            }, 200);
-        }
-
-        function stopListening() {
-            isListening = false;
-            clearTimeout(silenceTimer);
-            btnStop.style.display = "none";
-            btnEs.classList.remove('active-es');
-            btnDe.classList.remove('active-de');
-            statusDiv.innerText = "Bereit...";
-            try { recognition.stop(); } catch(e) {}
-        }
-
-        function resetSilenceTimer() {
-            const selectedSeconds = parseInt(delaySelect.value, 10);
-            statusDiv.innerText = `Sprechen erkannt... (Warte auf ${selectedSeconds}s Stille)`;
-            clearTimeout(silenceTimer);
-            
-            silenceTimer = setTimeout(() => {
-                if (lastText.trim() !== "") {
-                    translateAndSpeak(lastText);
-                }
-            }, selectedSeconds * 1000);
-        }
-
-        async function translateAndSpeak(text) {
-            statusDiv.innerText = "Übersetze mit DeepL...";
-            
-            const sourceLang = currentSourceLang.toUpperCase();
-            const targetLang = currentSourceLang === 'es' ? 'DE-DE' : 'ES';
-            const apiKey = apiKeyInput.value.trim();
-
-            try {
-                let translation = "";
-
-                if (apiKey) {
-                    // Nutzung von thingproxy zur Umgehung der CORS-Sperre
-                    const targetUrl = "https://api-free.deepl.com/v2/translate";
-                    const proxyUrl = "https://thingproxy.freeboard.io/fetch/" + targetUrl;
-
-                    const response = await fetch(proxyUrl, {
-                        method: "POST",
-                        headers: {
-                            "Authorization": `DeepL-Auth-Key ${apiKey}`,
-                            "Content-Type": "application/x-www-form-urlencoded"
-                        },
-                        body: new URLSearchParams({
-                            text: text,
-                            source_lang: sourceLang,
-                            target_lang: targetLang
-                        })
-                    });
-
-                    if (!response.ok) {
-                        const errData = await response.text();
-                        throw new Error(`HTTP ${response.status}: ${errData}`);
-                    }
-
-                    const data = await response.json();
-                    if (data.translations && data.translations.length > 0) {
-                        translation = data.translations[0].text;
-                    } else {
-                        throw new Error("Antwort unvollständig");
-                    }
-                } else {
-                    // Fallback auf MyMemory
-                    const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${currentSourceLang}|${currentSourceLang === 'es' ? 'de' : 'es'}`);
-                    const data = await response.json();
-                    translation = data.responseData.translatedText;
-                }
-
-                translatedDiv.innerText = translation;
-                statusDiv.innerText = "Lese vor...";
-
-                const utterance = new SpeechSynthesisUtterance(translation);
-                utterance.lang = currentSourceLang === 'es' ? 'de-DE' : 'es-ES';
-                
-                window.speechSynthesis.speak(utterance);
-
-                utterance.onend = () => {
-                    const langName = currentSourceLang === 'es' ? 'Spanisch 🇪🇸' : 'Deutsch 🇩🇪';
-                    statusDiv.innerText = `Fertig. Höre weiter zu auf ${langName}...`;
-                    lastText = "";
-                };
-
-            } catch (error) {
-                statusDiv.innerText = "Fehler: " + error.message;
-                console.error(error);
-            }
-        }
-    </script>
+    function downloadTranscript() {
+      if (transcriptData.length === 0) {
+        alert("Das Transkript ist noch leer.");
+        return;
+      }
+      const blob = new Blob([transcriptData.join('\n\n')], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `Transkript_${new Date().toISOString().slice(0,10)}.txt`;
+      a.click();
+    }
+  </script>
 </body>
 </html>
